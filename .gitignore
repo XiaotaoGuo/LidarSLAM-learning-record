@@ -1,0 +1,7 @@
+3rdparty
+build
+devel
+bag
+cmake-build-debug
+.idea
+.vscode
