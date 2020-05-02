@@ -204,10 +204,17 @@ bool IMLSICPMatcher::ImplicitMLSFunction(Eigen::Vector2d x,
         return false;
     }
 
-    //TODO
     //根据函数进行投影．计算height，即ppt中的I(x)
-
-    //end of TODO
+    double sum1 = 0.0, sum2 = 0.0;
+    for (int i = 0; i < nearPoints.size(); i++) {
+        auto p_i = nearPoints[i];
+        auto normal_i = nearNormals[i];
+        auto diff = x - p_i;
+        double wi = exp(- (diff.squaredNorm()) / (m_h * m_h));
+        sum1 += (wi * (diff.dot(normal_i)));
+        sum2 += wi;
+    }
+    height = sum1 / sum2;
 
     return true;
 }
@@ -286,10 +293,10 @@ void IMLSICPMatcher::projSourcePtToSurface(
         }
 
         Eigen::Vector2d yi;
-        //TODO
-        //计算yi．
 
-        //end of TODO
+        //计算yi．
+        yi = xi - height * nearNormal;
+
         out_cloud.push_back(yi);
         out_normal.push_back(nearNormal);
 
@@ -455,10 +462,11 @@ Eigen::Vector2d IMLSICPMatcher::ComputeNormal(std::vector<Eigen::Vector2d> &near
     // 特征分解
     Eigen::EigenSolver<Eigen::Matrix2d> solver(sigma);
     // 取出两个特征值
-    double lambda_1 = solver.eigenvalues()[0].real();
-    double lambda_2 = solver.eigenvalues()[1].real();
-    // 取出第二个特征值（最小的）对应的特征向量
-    normal = solver.eigenvectors().col(1).real().col(0);
+    Eigen::MatrixXd eigenvalue = solver.eigenvalues().real();
+    Eigen::MatrixXd eigenvector = solver.eigenvectors().real();
+    Eigen::Index evalsMin;
+    eigenvalue.rowwise().sum().minCoeff(&evalsMin);
+    normal << eigenvector(0, evalsMin), eigenvector(1, evalsMin);
 
     return normal;
 }
