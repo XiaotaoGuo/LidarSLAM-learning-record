@@ -346,13 +346,11 @@ void Scan2::scanCallBack(const sensor_msgs::LaserScan::ConstPtr &_laserScanMsg)
     std::cout <<"Data Cnt:"<<dataCnt<<std::endl;
 }
 
-//TODO:
 //求解得到两帧数据之间的位姿差
 //即求解当前位姿　在　上一时刻　坐标系中的坐标
 Eigen::Vector3d  cal_delta_distence(Eigen::Vector3d odom_pose)
 {
 
-    //TODO:
     Eigen::Vector3d d_pos;  //return value
     now_pos = odom_pose;
 
@@ -374,24 +372,6 @@ Eigen::Vector3d  cal_delta_distence(Eigen::Vector3d odom_pose)
 
     d_pos << T_last_now(0, 2), T_last_now(1, 2),
             atan2(T_last_now(1, 0), T_last_now(0, 0));
-    /*
-    //TODO:
-    Eigen::Vector3d now_last = now_pos - last_pos;
-    Eigen::Matrix3d last_T ;
-    last_T << cos(last_pos[2]),-sin(last_pos[2]),0,
-            sin(last_pos[2]),cos(last_pos[2]),0,
-            0,                0,               1;
-    d_pos = last_T.transpose() * now_last;
-    //degree regular
-    if(d_pos[2]>M_PI)
-        d_pos[2] = -M_PI + d_pos[2]-floor(d_pos[2]/M_PI)*M_PI;
-    if(d_pos[2]<-M_PI)
-        d_pos[2] = M_PI + d_pos[2]+floor(d_pos[2]/(-M_PI))*M_PI;
-
-    assert(d_pos[2] <= M_PI && d_pos[2] >= -M_PI);
-
-    //end of TODO:
-    */
 
     return d_pos;
 }
