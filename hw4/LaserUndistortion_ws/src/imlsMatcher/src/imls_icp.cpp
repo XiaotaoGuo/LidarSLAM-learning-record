@@ -436,10 +436,29 @@ Eigen::Vector2d IMLSICPMatcher::ComputeNormal(std::vector<Eigen::Vector2d> &near
 {
     Eigen::Vector2d normal;
 
-    //TODO
     //根据周围的激光点计算法向量，参考ppt中NICP计算法向量的方法
+    // 计算周围点的几何中心
+    Eigen::Vector2d meanPoints = Eigen::Vector2d::Zero();
+    for (auto p: nearPoints) {
+        meanPoints += p;
+    }
+    meanPoints /= nearPoints.size();
 
-    //end of TODO
+    // 计算方差
+    Eigen::Matrix2d sigma = Eigen::Matrix2d::Zero();
+    for (auto p: nearPoints) {
+        Eigen::Vector2d diff = p - meanPoints;
+        sigma += diff * diff.transpose();
+    }
+    sigma /= nearPoints.size();
+
+    // 特征分解
+    Eigen::EigenSolver<Eigen::Matrix2d> solver(sigma);
+    // 取出两个特征值
+    double lambda_1 = solver.eigenvalues()[0].real();
+    double lambda_2 = solver.eigenvalues()[1].real();
+    // 取出第二个特征值（最小的）对应的特征向量
+    normal = solver.eigenvectors().col(1).real().col(0);
 
     return normal;
 }
