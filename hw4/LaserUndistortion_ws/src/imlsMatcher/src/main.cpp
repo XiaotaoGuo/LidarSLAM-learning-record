@@ -31,6 +31,11 @@ public:
 
         m_isFirstFrame = true;
 
+        // 进行 pl-icp 相关设置
+        m_prevLDP = NULL;
+        SetPIICPParams();
+
+        // 读取 rosbag 信息
         rosbag::Bag bag;
         bag.open(bagfile, rosbag::bagmode::Read);
 
@@ -85,35 +90,65 @@ public:
             m_isFirstFrame = false;
             m_prevLaserPose = Eigen::Vector3d(0, 0, 0);
             pubPath(m_prevLaserPose, m_imlsPath, m_imlsPathPub);
-            ConvertChampionLaserScanToEigenPointCloud(msg, m_prevPointCloud);
+            if (!run_pl_icp) {
+                ConvertChampionLaserScanToEigenPointCloud(msg, m_prevPointCloud);
+            } else {
+                LaserScanToLDP(msg, m_prevLDP);
+            }
             return ;
         }
 
-        std::vector<Eigen::Vector2d> nowPts;
-        ConvertChampionLaserScanToEigenPointCloud(msg, nowPts);
+        if (!run_pl_icp) {
 
-        //调用imls进行icp匹配，并输出结果．
-        m_imlsMatcher.setSourcePointCloud(nowPts);
-        m_imlsMatcher.setTargetPointCloud(m_prevPointCloud);
+            std::vector<Eigen::Vector2d> nowPts;
+            ConvertChampionLaserScanToEigenPointCloud(msg, nowPts);
 
-        Eigen::Matrix3d rPose,rCovariance;
-        if(m_imlsMatcher.Match(rPose,rCovariance))
-        {
-            std::cout <<"IMLS Match Successful:"<<rPose(0,2)<<","<<rPose(1,2)<<","<<atan2(rPose(1,0),rPose(0,0))*57.295<<std::endl;
-            Eigen::Matrix3d lastPose;
-            lastPose << cos(m_prevLaserPose(2)), -sin(m_prevLaserPose(2)), m_prevLaserPose(0),
+            //调用imls进行icp匹配，并输出结果．
+            m_imlsMatcher.setSourcePointCloud(nowPts);
+            m_imlsMatcher.setTargetPointCloud(m_prevPointCloud);
+
+            Eigen::Matrix3d rPose,rCovariance;
+            if(m_imlsMatcher.Match(rPose,rCovariance))
+            {
+                std::cout <<"IMLS Match Successful:"<<rPose(0,2)<<","<<rPose(1,2)<<","<<atan2(rPose(1,0),rPose(0,0))*57.295<<std::endl;
+                Eigen::Matrix3d lastPose;
+                lastPose << cos(m_prevLaserPose(2)), -sin(m_prevLaserPose(2)), m_prevLaserPose(0),
                         sin(m_prevLaserPose(2)),  cos(m_prevLaserPose(2)), m_prevLaserPose(1),
                         0, 0, 1;
+                Eigen::Matrix3d nowPose = lastPose * rPose;
+                m_prevLaserPose << nowPose(0, 2), nowPose(1, 2), atan2(nowPose(1,0), nowPose(0,0));
+                pubPath(m_prevLaserPose, m_imlsPath, m_imlsPathPub);
+            }
+            else
+            {
+                std::cout <<"IMLS Match Failed!!!!"<<std::endl;
+            }
+
+            m_prevPointCloud = nowPts;
+
+        } else { // 用 csm 进行 pl-icp
+
+            //把当前的激光数据转换为 pl-icp能识别的数据 & 进行矫正
+            //d_point_scan就是用激光计算得到的两帧数据之间的旋转 & 平移
+            LDP currentLDP;
+            LaserScanToLDP(msg, currentLDP);
+            Eigen::Vector3d d_point_scan = PIICPBetweenTwoFrames(currentLDP, Eigen::Vector3d::Zero());
+            Eigen::Matrix3d lastPose, rPose;
+
+            lastPose << cos(m_prevLaserPose(2)), -sin(m_prevLaserPose(2)), m_prevLaserPose(0),
+                        sin(m_prevLaserPose(2)),  cos(m_prevLaserPose(2)), m_prevLaserPose(1),
+                        0,  0,  1;
+
+            rPose << cos(d_point_scan(2)), -sin(d_point_scan(2)), d_point_scan(0),
+                    sin(d_point_scan(2)),  cos(d_point_scan(2)), d_point_scan(1),
+                    0,  0,  1;
+
             Eigen::Matrix3d nowPose = lastPose * rPose;
-            m_prevLaserPose << nowPose(0, 2), nowPose(1, 2), atan2(nowPose(1,0), nowPose(0,0));
+            m_prevLaserPose << nowPose(0, 2) , nowPose(1, 2), atan2(nowPose(1, 0), nowPose(0, 0));
             pubPath(m_prevLaserPose, m_imlsPath, m_imlsPathPub);
-        }
-        else
-        {
-            std::cout <<"IMLS Match Failed!!!!"<<std::endl;
+
         }
 
-        m_prevPointCloud = nowPts;
     }
 
     void odomCallback(const nav_msgs::OdometryConstPtr& msg)
@@ -217,11 +252,95 @@ public:
 
     }
 
-    void LaserScanToLDP(sensor_msgs::LaserScan *pScan,
-                        LDP& ldp);
-    Eigen::Vector3d  PIICPBetweenTwoFrames(LDP& currentLDPScan,
-                                           Eigen::Vector3d tmprPose);
+    void LaserScanToLDP(const champion_nav_msgs::ChampionNavLaserScanConstPtr& pScan,
+                        LDP& ldp) {
+        int nPts = pScan->ranges.size();
+        ldp = ld_alloc_new(nPts);
 
+        for(int i = 0;i < nPts;i++)
+        {
+            double dist = pScan->ranges[i];
+            if(dist > 0.1 && dist < 20)
+            {
+                ldp->valid[i] = 1;
+                ldp->readings[i] = dist;
+            }
+            else
+            {
+                ldp->valid[i] = 0;
+                ldp->readings[i] = -1;
+            }
+            ldp->theta[i] = pScan->angles[i];
+        }
+        ldp->min_theta = ldp->theta[0];
+        ldp->max_theta = ldp->theta[nPts-1];
+
+        ldp->odometry[0] = 0.0;
+        ldp->odometry[1] = 0.0;
+        ldp->odometry[2] = 0.0;
+
+        ldp->true_pose[0] = 0.0;
+        ldp->true_pose[1] = 0.0;
+        ldp->true_pose[2] = 0.0;
+    }
+
+    Eigen::Vector3d  PIICPBetweenTwoFrames(LDP& currentLDPScan,
+                                           Eigen::Vector3d tmprPose) {
+        m_prevLDP->odometry[0] = 0.0;
+        m_prevLDP->odometry[1] = 0.0;
+        m_prevLDP->odometry[2] = 0.0;
+
+        m_prevLDP->estimate[0] = 0.0;
+        m_prevLDP->estimate[1] = 0.0;
+        m_prevLDP->estimate[2] = 0.0;
+
+        m_prevLDP->true_pose[0] = 0.0;
+        m_prevLDP->true_pose[1] = 0.0;
+        m_prevLDP->true_pose[2] = 0.0;
+
+        //设置匹配的参数值
+        m_PIICPParams.laser_ref = m_prevLDP;
+        m_PIICPParams.laser_sens = currentLDPScan;
+
+        m_PIICPParams.first_guess[0] = tmprPose(0);
+        m_PIICPParams.first_guess[1] = tmprPose(1);
+        m_PIICPParams.first_guess[2] = tmprPose(2);
+
+        m_OutputResult.cov_x_m = 0;
+        m_OutputResult.dx_dy1_m = 0;
+        m_OutputResult.dx_dy2_m = 0;
+
+        sm_icp(&m_PIICPParams,&m_OutputResult);
+
+        //nowPose在lastPose中的坐标
+        Eigen::Vector3d  rPose;
+        if(m_OutputResult.valid)
+        {
+            //得到两帧激光之间的相对位姿
+            rPose(0)=(m_OutputResult.x[0]);
+            rPose(1)=(m_OutputResult.x[1]);
+            rPose(2)=(m_OutputResult.x[2]);
+
+//        std::cout <<"Iter:"<<m_OutputResult.iterations<<std::endl;
+//        std::cout <<"Corr:"<<m_OutputResult.nvalid<<std::endl;
+//        std::cout <<"Erro:"<<m_OutputResult.error<<std::endl;
+
+//        std::cout <<"PI ICP GOOD"<<std::endl;
+        }
+        else
+        {
+            std::cout <<"PI ICP Failed!!!!!!!"<<std::endl;
+            rPose = tmprPose;
+        }
+
+        //更新
+
+        //ld_free(m_prevLDP);
+
+        m_prevLDP = currentLDPScan;
+
+        return rPose;
+    }
 
     bool m_isFirstFrame;
     ros::NodeHandle m_nh;
@@ -239,6 +358,7 @@ public:
     ros::Publisher m_odomPathPub;
 
     // csm 进行 pl-icp 需要的变量
+    bool run_pl_icp = true;
     LDP m_prevLDP;
     sm_params m_PIICPParams;
     sm_result m_OutputResult;
