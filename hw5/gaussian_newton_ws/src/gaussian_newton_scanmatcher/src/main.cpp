@@ -19,7 +19,7 @@ public:
         m_gaussianNewtonPub = m_nh.advertise<nav_msgs::Path>("gaussian_newton_path",1,true);
     }
 
-    //单纯的数据类型转换，不进行坐标系转换．
+    // 单纯的数据类型转换，不进行坐标系转换．
     void ConvertLaserScanToEigenPointCloud(const sensor_msgs::LaserScanConstPtr& msg,
                                                    std::vector<Eigen::Vector2d>& eigen_pts)
     {

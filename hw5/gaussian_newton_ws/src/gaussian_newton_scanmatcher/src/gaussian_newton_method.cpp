@@ -88,9 +88,32 @@ map_t* CreateMapFromLaserPoints(Eigen::Vector3d map_origin_pt,
 Eigen::Vector3d InterpMapValueWithDerivatives(map_t* map,Eigen::Vector2d& coords)
 {
     Eigen::Vector3d ans;
-    //TODO
 
-    //END OF TODO
+    /// calculate coordinates on the given map (noticed: might not be exact interger)
+    /// remember the origin of map locates in center of the map thus need to plus half of size to get the real index
+    double index_x = (coords(0) - map->origin_x) / map->resolution + map->size_x / 2;
+    double index_y = (coords(1) - map->origin_y) / map->resolution + map->size_y / 2;
+    int16_t index_x0 = floor(index_x);
+    int16_t index_y0 = floor(index_y);
+
+    /// calculate u, v using four nearest points
+    double u, v;
+    u = index_x - index_x0;
+    v = index_y - index_y0;
+
+    /// calcualte scores for four nearest points
+    double z1 = map->cells[MAP_INDEX(map, index_x0, index_y0)].score;
+    double z2 = map->cells[MAP_INDEX(map, index_x0 + 1, index_y0)].score;
+    double z3 = map->cells[MAP_INDEX(map, index_x0 + 1, index_y0 + 1)].score;
+    double z4 = map->cells[MAP_INDEX(map, index_x0, index_y0 + 1)].score;
+
+    /// score of given coordinate in the map
+    ans(0) = (1 - u) * (1 - v) * z1 + u * (1 - v) * z2 + u * v * z3 + (1 - u) * v * z4;
+
+    /// gradient
+    /// noticed: need to remove scale influence by using resolution
+    ans(1) = (v * (z3 - z4) + (1 - v) * (z2 - z1)) / map->resolution;
+    ans(2) = (u * (z3 - z2) + (1 - u) * (z4 - z1)) / map->resolution;
 
     return ans;
 }
@@ -112,9 +135,28 @@ void ComputeHessianAndb(map_t* map, Eigen::Vector3d now_pose,
     H = Eigen::Matrix3d::Zero();
     b = Eigen::Vector3d::Zero();
 
-    //TODO
+    Eigen::Matrix3d T = GN_V2T(now_pose);
 
-    //END OF TODO
+    for (Eigen::Vector2d pt: laser_pts) {
+
+        /// compute laser pt pose globally
+        Eigen::Vector2d pt_pose = GN_TransPoint(pt, T);
+
+        Eigen::Matrix<double, 2, 3> ds;
+        ds << 1, 0, -sin(now_pose(2)) * pt(0) - cos(now_pose(2)) * pt(1),
+                0, 1, cos(now_pose(2)) * pt(0) - sin(now_pose(2)) * pt(1);
+
+        /// compute score & grident of that point in map
+        Eigen::Vector3d score_gradient = InterpMapValueWithDerivatives(map, pt_pose);
+        Eigen::Vector2d gradient(score_gradient(1), score_gradient(2));
+        double score = score_gradient(0);
+
+        /// noticed the dimension of J should 1 x 3
+        Eigen::RowVector3d J = gradient.transpose() * ds;
+        H += J.transpose() * J;
+        b += J.transpose() * (1 - score);
+    }
+
 }
 
 
@@ -129,12 +171,17 @@ void GaussianNewtonOptimization(map_t*map,Eigen::Vector3d& init_pose,std::vector
 {
     int maxIteration = 20;
     Eigen::Vector3d now_pose = init_pose;
+    Eigen::Matrix3d H;
+    Eigen::Vector3d b;
 
     for(int i = 0; i < maxIteration;i++)
     {
-        //TODO
 
-        //END OF TODO
+        ComputeHessianAndb(map, now_pose, laser_pts, H, b);
+
+        Eigen::Vector3d delta_x = H.colPivHouseholderQr().solve(b);
+
+        now_pose += delta_x;
     }
     init_pose = now_pose;
 
