@@ -119,9 +119,9 @@ int main(int argc, char **argv)
     beforeGraphPub = nodeHandle.advertise<visualization_msgs::MarkerArray>("beforePoseGraph",1,true);
     afterGraphPub  = nodeHandle.advertise<visualization_msgs::MarkerArray>("afterPoseGraph",1,true);
 
-
-    std::string VertexPath = "/home/eventec/LSSLAMProject/src/ls_slam/data/test_quadrat-v.dat";
-    std::string EdgePath = "/home/eventec/LSSLAMProject/src/ls_slam/data/test_quadrat-e.dat";
+    // change to your data folder path
+    std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-v.dat";
+    std::string EdgePath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-e.dat";
 
 //    std::string VertexPath = "/home/eventec/LSSLAMProject/src/ls_slam/data/intel-v.dat";
 //    std::string EdgePath = "/home/eventec/LSSLAMProject/src/ls_slam/data/intel-e.dat";
