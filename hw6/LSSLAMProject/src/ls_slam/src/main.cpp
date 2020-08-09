@@ -120,11 +120,14 @@ int main(int argc, char **argv)
     afterGraphPub  = nodeHandle.advertise<visualization_msgs::MarkerArray>("afterPoseGraph",1,true);
 
     // change to your data folder path
-    std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-v.dat";
-    std::string EdgePath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-e.dat";
+    // std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-v.dat";
+    // std::string EdgePath   = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-e.dat";
 
-//    std::string VertexPath = "/home/eventec/LSSLAMProject/src/ls_slam/data/intel-v.dat";
-//    std::string EdgePath = "/home/eventec/LSSLAMProject/src/ls_slam/data/intel-e.dat";
+    // std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/intel-v.dat";
+    // std::string EdgePath   = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/intel-e.dat";
+
+    std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/killian-v.dat";
+    std::string EdgePath   = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/killian-e.dat";
 
     std::vector<Eigen::Vector3d> Vertexs;
     std::vector<Edge> Edges;
@@ -137,19 +140,20 @@ int main(int argc, char **argv)
                                 Edges);
 
     double initError = ComputeError(Vertexs,Edges);
-    std::cout <<"initError:"<<initError<<std::endl;
+    std::cout << "initError: " <<initError<<std::endl;
 
     int maxIteration = 100;
     double epsilon = 1e-4;
 
     for(int i = 0; i < maxIteration;i++)
     {
-        std::cout <<"Iterations:"<<i<<std::endl;
+        std::cout << "Iterations: " << i <<std::endl;
         Eigen::VectorXd dx = LinearizeAndSolve(Vertexs,Edges);
 
         //进行更新
-        //TODO--Start
-        //TODO--End
+        for (int j = 0; j < Vertexs.size(); j++) {
+            Vertexs[j] += dx.segment<3>(j * 3);
+        }
 
         double maxError = -1;
         for(int k = 0; k < 3 * Vertexs.size();k++)
@@ -167,7 +171,7 @@ int main(int argc, char **argv)
 
     double finalError  = ComputeError(Vertexs,Edges);
 
-    std::cout <<"FinalError:"<<finalError<<std::endl;
+    std::cout << "FinalError: " << finalError << std::endl;
 
     PublishGraphForVisulization(&afterGraphPub,
                                 Vertexs,
