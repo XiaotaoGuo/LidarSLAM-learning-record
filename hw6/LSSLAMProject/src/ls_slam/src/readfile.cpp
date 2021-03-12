@@ -100,7 +100,7 @@ void ReadVertexInformation(const std::string path,std::vector<Eigen::Vector3d>& 
 }
 
 
-void ReadEdgesInformation(const std::string path,std::vector<Edge>& edges)
+void ReadEdgesInformation(const std::string path,std::vector<myEdge>& edges)
 {
     std::ifstream fin(path.c_str());
     if(fin.is_open() == false)
@@ -133,7 +133,7 @@ void ReadEdgesInformation(const std::string path,std::vector<Edge>& edges)
         double inf_xt  = stringToNum<double>(results[10]);
         double inf_yt  = stringToNum<double>(results[11]);
 
-        Edge tmpEdge;
+        myEdge tmpEdge;
         tmpEdge.xi = xi;
         tmpEdge.xj = xj;
 

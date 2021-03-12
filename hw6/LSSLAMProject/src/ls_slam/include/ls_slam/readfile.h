@@ -7,15 +7,7 @@
 
 #include "gaussian_newton.h"
 
-
 void ReadVertexInformation(const std::string path,std::vector<Eigen::Vector3d>& nodes);
-void ReadEdgesInformation(const std::string path,std::vector<Edge>& edges);
-
-
-
-
-
-
-
+void ReadEdgesInformation(const std::string path,std::vector<myEdge>& edges);
 
 #endif

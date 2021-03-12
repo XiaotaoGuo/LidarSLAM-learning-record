@@ -5,43 +5,23 @@
 #include <eigen3/Eigen/Cholesky>
 #include <eigen3/Eigen/LU>
 
+#include <eigen3/Eigen/SparseQR>
 #include <eigen3/Eigen/SparseCholesky>
+#include<Eigen/IterativeLinearSolvers>
 
 #include <iostream>
 #include <ctime>
 
-
-//位姿-->转换矩阵
-Eigen::Matrix3d PoseToTrans(Eigen::Vector3d x)
-{
-    Eigen::Matrix3d trans;
-    trans << cos(x(2)),-sin(x(2)),x(0),
-             sin(x(2)), cos(x(2)),x(1),
-                     0,         0,    1;
-
-    return trans;
-}
-
-
-//转换矩阵－－＞位姿
-Eigen::Vector3d TransToPose(Eigen::Matrix3d trans)
-{
-    Eigen::Vector3d pose;
-    pose(0) = trans(0,2);
-    pose(1) = trans(1,2);
-    pose(2) = atan2(trans(1,0),trans(0,0));
-
-    return pose;
-}
+#include "utilities.hpp"
 
 //计算整个pose-graph的误差
 double ComputeError(std::vector<Eigen::Vector3d>& Vertexs,
-                    std::vector<Edge>& Edges)
+                    std::vector<myEdge>& Edges)
 {
     double sumError = 0;
     for(int i = 0; i < Edges.size();i++)
     {
-        Edge tmpEdge = Edges[i];
+        myEdge tmpEdge = Edges[i];
         Eigen::Vector3d xi = Vertexs[tmpEdge.xi];
         Eigen::Vector3d xj = Vertexs[tmpEdge.xj];
         Eigen::Vector3d z = tmpEdge.measurement;
@@ -121,7 +101,7 @@ void CalcJacobianAndError(Eigen::Vector3d xi,Eigen::Vector3d xj,Eigen::Vector3d 
  * @return          位姿的增量
  */
 Eigen::VectorXd  LinearizeAndSolve(std::vector<Eigen::Vector3d>& Vertexs,
-                                   std::vector<Edge>& Edges)
+                                   std::vector<myEdge>& Edges)
 {
     //申请内存
     Eigen::MatrixXd H(Vertexs.size() * 3,Vertexs.size() * 3);
@@ -139,7 +119,7 @@ Eigen::VectorXd  LinearizeAndSolve(std::vector<Eigen::Vector3d>& Vertexs,
     for(int i = 0; i < Edges.size();i++)
     {
         //提取信息
-        Edge tmpEdge = Edges[i];
+        myEdge tmpEdge = Edges[i];
         Eigen::Vector3d xi = Vertexs[tmpEdge.xi];
         Eigen::Vector3d xj = Vertexs[tmpEdge.xj];
         Eigen::Vector3d z = tmpEdge.measurement;

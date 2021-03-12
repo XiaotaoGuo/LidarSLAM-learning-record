@@ -1,14 +1,19 @@
+#include <chrono>
+
 #include <gaussian_newton.h>
 #include <readfile.h>
 
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#ifdef USE_CERES
+#include "auto_solvers/ceres/ceres_method.h"
+#endif
 
 //for visual
 void PublishGraphForVisulization(ros::Publisher* pub,
                                  std::vector<Eigen::Vector3d>& Vertexs,
-                                 std::vector<Edge>& Edges,
+                                 std::vector<myEdge>& Edges,
                                  int color = 0)
 {
     visualization_msgs::MarkerArray marray;
@@ -85,7 +90,7 @@ void PublishGraphForVisulization(ros::Publisher* pub,
     //加入边
     for(int i = 0; i < Edges.size();i++)
     {
-        Edge tmpEdge = Edges[i];
+        myEdge tmpEdge = Edges[i];
         edge.points.clear();
 
         geometry_msgs::Point p;
@@ -120,17 +125,17 @@ int main(int argc, char **argv)
     afterGraphPub  = nodeHandle.advertise<visualization_msgs::MarkerArray>("afterPoseGraph",1,true);
 
     // change to your data folder path
-    // std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-v.dat";
-    // std::string EdgePath   = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-e.dat";
+    // std::string VertexPath = "/home/xt/Projects/LidarSLAM-learning-record/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-v.dat";
+    // std::string EdgePath   = "/home/xt/Projects/LidarSLAM-learning-record/hw6/LSSLAMProject/src/ls_slam/data/test_quadrat-e.dat";
 
-    // std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/intel-v.dat";
-    // std::string EdgePath   = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/intel-e.dat";
+    // std::string VertexPath = "/home/xt/Projects/LidarSLAM-learning-record/hw6/LSSLAMProject/src/ls_slam/data/intel-v.dat";
+    // std::string EdgePath   = "/home/xt/Projects/LidarSLAM-learning-record/hw6/LSSLAMProject/src/ls_slam/data/intel-e.dat";
 
-    std::string VertexPath = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/killian-v.dat";
-    std::string EdgePath   = "/mnt/BCD8AFDDD8AF9464/lidar-slam/lidar-slam/hw6/LSSLAMProject/src/ls_slam/data/killian-e.dat";
+    std::string VertexPath = "/home/xt/Projects/LidarSLAM-learning-record/hw6/LSSLAMProject/src/ls_slam/data/killian-v.dat";
+    std::string EdgePath   = "/home/xt/Projects/LidarSLAM-learning-record/hw6/LSSLAMProject/src/ls_slam/data/killian-e.dat";
 
     std::vector<Eigen::Vector3d> Vertexs;
-    std::vector<Edge> Edges;
+    std::vector<myEdge> Edges;
 
     ReadVertexInformation(VertexPath,Vertexs);
     ReadEdgesInformation(EdgePath,Edges);
@@ -142,6 +147,13 @@ int main(int argc, char **argv)
     double initError = ComputeError(Vertexs,Edges);
     std::cout << "initError: " <<initError<<std::endl;
 
+    using namespace std::chrono;
+    auto start = system_clock::now();
+    #ifndef USE_CERES
+    /**
+     *  Gaussian Newton method
+     */
+    std::cout << "Use Custom Guassian Newton Method.\n";
     int maxIteration = 100;
     double epsilon = 1e-4;
 
@@ -168,9 +180,37 @@ int main(int argc, char **argv)
             break;
     }
 
+    #else
+    std::cout << "Use ceres" << std::endl;
+    ceres::Problem problem;
+
+    for (const auto& edge: Edges) {
+        Eigen::Matrix3d sqrt_info = edge.infoMatrix.array().sqrt();
+        
+        // ceres::CostFunction* cost_function = PoseGraph2dErrorTerm::Create(edge.measurement(0), edge.measurement(1), edge.measurement(2), sqrt_info);
+        // problem.AddResidualBlock(cost_function, nullptr, Vertexs[edge.xi].data(), Vertexs[edge.xi].data() + 1, Vertexs[edge.xi].data() + 2, Vertexs[edge.xj].data(), Vertexs[edge.xj].data() + 1, Vertexs[edge.xj].data() + 2);
+        
+        // ceres::CostFunction* cost_function = AutoDiffFunctor::create(edge);
+        // problem.AddResidualBlock(cost_function, nullptr, Vertexs[edge.xi].data(), Vertexs[edge.xj].data());
+
+
+        ceres::CostFunction* cost_function = new AnalyticDiffFunction(edge);
+        problem.AddResidualBlock(cost_function, nullptr, Vertexs[edge.xi].data(), Vertexs[edge.xj].data());
+    }
+
+    ceres::Solver::Options options;
+    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+    options.minimizer_progress_to_stdout = true;
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+    std::cout << summary.FullReport() << "\n";
+    #endif
 
     double finalError  = ComputeError(Vertexs,Edges);
 
+    auto end = system_clock::now();
+    auto duration = duration_cast<microseconds>(end - start);
+    std::cout << "Takes :" << double(duration.count()) * microseconds::period::num / microseconds::period::den << " Seconds." << std::endl;
     std::cout << "FinalError: " << finalError << std::endl;
 
     PublishGraphForVisulization(&afterGraphPub,
