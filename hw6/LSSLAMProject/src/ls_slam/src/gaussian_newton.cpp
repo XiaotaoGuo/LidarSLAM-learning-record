@@ -7,7 +7,7 @@
 
 #include <eigen3/Eigen/SparseQR>
 #include <eigen3/Eigen/SparseCholesky>
-#include<Eigen/IterativeLinearSolvers>
+//#include<Eigen/IterativeLinearSolvers>
 
 #include <iostream>
 #include <ctime>
@@ -52,7 +52,7 @@ double ComputeError(std::vector<Eigen::Vector3d>& Vertexs,
  * @param Ai    相对于xi的Jacobian矩阵
  * @param Bi    相对于xj的Jacobian矩阵
  */
-void CalcJacobianAndError(Eigen::Vector3d xi,Eigen::Vector3d xj,Eigen::Vector3d z,
+void CalcJacobianAndError(Eigen::Vector3d& xi,Eigen::Vector3d& xj,Eigen::Vector3d& z,
                           Eigen::Vector3d& ei,Eigen::Matrix3d& Ai,Eigen::Matrix3d& Bi)
 {
     //TODO--Start
@@ -104,8 +104,8 @@ Eigen::VectorXd  LinearizeAndSolve(std::vector<Eigen::Vector3d>& Vertexs,
                                    std::vector<myEdge>& Edges)
 {
     //申请内存
-    Eigen::MatrixXd H(Vertexs.size() * 3,Vertexs.size() * 3);
-    Eigen::VectorXd b(Vertexs.size() * 3);
+    static Eigen::MatrixXd H(Vertexs.size() * 3,Vertexs.size() * 3);
+    static Eigen::VectorXd b(Vertexs.size() * 3);
 
     H.setZero();
     b.setZero();

@@ -10,6 +10,10 @@
 #include "auto_solvers/ceres/ceres_method.h"
 #endif
 
+#ifdef USE_G2O
+#include "auto_solvers/g2o/g2o_method.h"
+#endif
+
 //for visual
 void PublishGraphForVisulization(ros::Publisher* pub,
                                  std::vector<Eigen::Vector3d>& Vertexs,
@@ -149,13 +153,20 @@ int main(int argc, char **argv)
 
     using namespace std::chrono;
     auto start = system_clock::now();
+    
+    #ifdef USE_G2O
+
+    std::cout << "Use G2O Guassian Newton Method.\n";
+    g2o_method::solveProblems(Vertexs, Edges);
+
+    #else
     #ifndef USE_CERES
     /**
      *  Gaussian Newton method
      */
     std::cout << "Use Custom Guassian Newton Method.\n";
     int maxIteration = 100;
-    double epsilon = 1e-4;
+    double epsilon = 1e-6;
 
     for(int i = 0; i < maxIteration;i++)
     {
@@ -204,6 +215,7 @@ int main(int argc, char **argv)
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
+    #endif
     #endif
 
     double finalError  = ComputeError(Vertexs,Edges);

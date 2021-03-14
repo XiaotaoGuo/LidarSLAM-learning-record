@@ -1,0 +1,4 @@
+[submodule "hw6/LSSLAMProject/3rdparty/g2o"]
+	path = hw6/LSSLAMProject/3rdparty/g2o
+	url = https://github.com/RainerKuemmerle/g2o.git
+	branch = master

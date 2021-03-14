@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1.0)
 project(ls_slam)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -21,6 +21,13 @@ if( USE_CERES )
   find_package(Ceres REQUIRED)
 endif()
 
+message("USE_CERES=${USE_G2O}")
+if (USE_G2O)
+  add_definitions(-DUSE_G2O)
+  find_package(G2O REQUIRED)
+  message(STATUS "Find G2O: ${G2O_INCLUDE_DIR}")
+endif()
+
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -40,21 +47,31 @@ catkin_package(
 ###########
 ## Build ##
 ###########
-
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
   include
   include/ls_slam
   ${catkin_INCLUDE_DIRS}  ${EIGEN_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
+  ${G2O_INCLUDE_DIR}
 )
 
-add_executable(ls_slam src/main.cpp src/readfile.cpp src/gaussian_newton.cpp src/utilities.cpp)
-target_link_libraries(ls_slam ${catkin_LIBRARIES} ${CSPARSE_LIBRARY} ceres)
+add_executable(ls_slam src/main.cpp src/readfile.cpp src/gaussian_newton.cpp)
+target_link_libraries(ls_slam ${catkin_LIBRARIES})
 
 if ( USE_CERES )
   target_link_libraries(ls_slam ceres)
+  target_link_libraries(ls_slam ${CSPARSE_LIBRARY} ceres)
 endif()
+
+if ( USE_G2O )
+  target_sources(ls_slam PRIVATE src/g2o/g2o_method.cpp)
+  include_directories(${G2O_INCLUDE_DIR})
+  target_link_libraries(ls_slam ${G2O_CORE_LIBRARY} ${G2O_TYPES_SLAM2D} ${G2O_SOLVER_EIGEN} ${G2O_STUFF_LIBRARY})
+endif()
+
+
 
 #############
 ## Testing ##
