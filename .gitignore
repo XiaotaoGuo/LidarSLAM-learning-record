@@ -4,3 +4,4 @@ bag
 cmake-build-debug
 .idea
 .vscode
+.catkin_workspace
