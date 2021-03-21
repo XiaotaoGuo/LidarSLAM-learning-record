@@ -14,6 +14,8 @@
 #include "auto_solvers/g2o/g2o_method.h"
 #endif
 
+#include "auto_solvers/gtsam/gtsam_method.h"
+
 //for visual
 void PublishGraphForVisulization(ros::Publisher* pub,
                                  std::vector<Eigen::Vector3d>& Vertexs,
@@ -164,32 +166,37 @@ int main(int argc, char **argv)
     /**
      *  Gaussian Newton method
      */
-    std::cout << "Use Custom Guassian Newton Method.\n";
-    int maxIteration = 100;
-    double epsilon = 1e-6;
+    // std::cout << "Use Custom Guassian Newton Method.\n";
+    // int maxIteration = 100;
+    // double epsilon = 1e-6;
 
-    for(int i = 0; i < maxIteration;i++)
-    {
-        std::cout << "Iterations: " << i <<std::endl;
-        Eigen::VectorXd dx = LinearizeAndSolve(Vertexs,Edges);
+    // for(int i = 0; i < maxIteration;i++)
+    // {
+    //     std::cout << "Iterations: " << i <<std::endl;
+    //     Eigen::VectorXd dx = LinearizeAndSolve(Vertexs,Edges);
 
-        //进行更新
-        for (int j = 0; j < Vertexs.size(); j++) {
-            Vertexs[j] += dx.segment<3>(j * 3);
-        }
+    //     //进行更新
+    //     for (int j = 0; j < Vertexs.size(); j++) {
+    //         Vertexs[j] += dx.segment<3>(j * 3);
+    //     }
 
-        double maxError = -1;
-        for(int k = 0; k < 3 * Vertexs.size();k++)
-        {
-            if(maxError < std::fabs(dx(k)))
-            {
-                maxError = std::fabs(dx(k));
-            }
-        }
+    //     double maxError = -1;
+    //     for(int k = 0; k < 3 * Vertexs.size();k++)
+    //     {
+    //         if(maxError < std::fabs(dx(k)))
+    //         {
+    //             maxError = std::fabs(dx(k));
+    //         }
+    //     }
 
-        if(maxError < epsilon)
-            break;
-    }
+    //     if(maxError < epsilon)
+    //         break;
+    // }
+
+    /**
+     * GSTAM
+     */
+    gtsam_method::solveProblems(Vertexs, Edges);
 
     #else
     std::cout << "Use ceres" << std::endl;

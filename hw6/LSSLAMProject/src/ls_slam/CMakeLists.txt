@@ -19,6 +19,7 @@ message("USE_CERES=${USE_CERES}")
 if( USE_CERES )
   add_definitions(-DUSE_CERES)  
   find_package(Ceres REQUIRED)
+  message(STATUS "Find Ceres: ${CERES_INCLUDE_DIR}")
 endif()
 
 message("USE_CERES=${USE_G2O}")
@@ -27,6 +28,10 @@ if (USE_G2O)
   find_package(G2O REQUIRED)
   message(STATUS "Find G2O: ${G2O_INCLUDE_DIR}")
 endif()
+
+find_package(GTSAM REQUIRED)
+message(STATUS "Find GTSAM: ${GTSAM_INCLUDE_DIR}")
+
 
 ###################################
 ## catkin specific configuration ##
@@ -66,11 +71,13 @@ if ( USE_CERES )
 endif()
 
 if ( USE_G2O )
-  target_sources(ls_slam PRIVATE src/g2o/g2o_method.cpp)
+  target_sources(ls_slam PRIVATE src/g2o_method/g2o_method.cpp)
   include_directories(${G2O_INCLUDE_DIR})
   target_link_libraries(ls_slam ${G2O_CORE_LIBRARY} ${G2O_TYPES_SLAM2D} ${G2O_SOLVER_EIGEN} ${G2O_STUFF_LIBRARY})
 endif()
 
+target_sources(ls_slam PRIVATE src/gtsam_method/gtsam_method.cpp)
+target_link_libraries(ls_slam gtsam)
 
 
 #############
